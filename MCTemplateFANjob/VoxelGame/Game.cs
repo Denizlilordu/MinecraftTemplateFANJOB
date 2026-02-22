@@ -6,6 +6,7 @@ namespace VoxelGame;
 public class Game : GameWindow
 {
     Shader shader = null!;
+    Shader crosshairShader = null!;
     List<Chunk> chunks = new();
     Camera camera;
     int texture;
@@ -50,6 +51,31 @@ public class Game : GameWindow
 
         shader = new Shader(vertex, fragment);
 
+        // Create crosshair shader
+        string crosshairVert = @"
+        #version 330 core
+        layout (location = 0) in vec3 aPos;
+        
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+        
+        void main()
+        {
+            gl_Position = projection * view * model * vec4(aPos, 1.0);
+        }";
+
+        string crosshairFrag = @"
+        #version 330 core
+        out vec4 FragColor;
+        
+        void main()
+        {
+            FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        }";
+
+        crosshairShader = new Shader(crosshairVert, crosshairFrag);
+
         // Create a 3x3 chunk area centered on 0,0
         for (int cx = -1; cx <= 1; cx++)
         for (int cz = -1; cz <= 1; cz++)
@@ -60,12 +86,12 @@ public class Game : GameWindow
         camera = new Camera(new Vector3(8, 10, 25));
         camera.SetChunks(chunks);
 
-        // Create a 4x4 cell atlas (16x16 px) programmatically
+        // Create a 4x4 cell atlas (256x256 px) programmatically with high detail
         texture = GL.GenTexture();
         GL.BindTexture(OpenTK.Graphics.OpenGL4.TextureTarget.Texture2D, texture);
 
         int atlasCells = 4;
-        int cellSize = 4; // each cell 4x4 px => atlas 16x16
+        int cellSize = 64; // each cell 64x64 px => atlas 256x256
         int atlasSize = atlasCells * cellSize;
         byte[] texData = new byte[atlasSize * atlasSize * 4];
 
@@ -79,6 +105,36 @@ public class Game : GameWindow
             texData[idx + 3] = a;
         }
 
+        // Helper to add procedural noise/details to a block of pixels
+        void FillCellWithDetail(int cellX, int cellY, byte r, byte g, byte b)
+        {
+            int sx = cellX * cellSize;
+            int sy = cellY * cellSize;
+            System.Random rand = new(cellX * 1000 + cellY);
+
+            for (int py = 0; py < cellSize; py++)
+            {
+                for (int px = 0; px < cellSize; px++)
+                {
+                    // Add slight color variation for texture details
+                    int variation = rand.Next(-20, 20);
+                    byte rr = (byte)System.Math.Clamp(r + variation, 0, 255);
+                    byte gg = (byte)System.Math.Clamp(g + variation, 0, 255);
+                    byte bb = (byte)System.Math.Clamp(b + variation, 0, 255);
+
+                    // Add subtle dot pattern for extra detail
+                    if (rand.Next(100) < 3)
+                    {
+                        rr = (byte)System.Math.Clamp(rr - 30, 0, 255);
+                        gg = (byte)System.Math.Clamp(gg - 30, 0, 255);
+                        bb = (byte)System.Math.Clamp(bb - 30, 0, 255);
+                    }
+
+                    SetPixel(sx + px, sy + py, rr, gg, bb, 255);
+                }
+            }
+        }
+
         // define cell colors: (cellX,cellY)
         // (0,0): grass top, (1,0): dirt, (2,0): grass side, (3,0): stone
         // (0,1): dirt green, (1,1): stone green
@@ -90,22 +146,21 @@ public class Game : GameWindow
         (byte r,byte g,byte b) stoneGreen = (80,140,80);
         (byte r,byte g,byte b) filler = (255,0,255);
 
-        for (int cy = 0; cy < atlasCells; cy++)
-        for (int cx = 0; cx < atlasCells; cx++)
+        // Fill cells with detailed textures
+        FillCellWithDetail(0, 0, grassTop.r, grassTop.g, grassTop.b);
+        FillCellWithDetail(1, 0, dirt.r, dirt.g, dirt.b);
+        FillCellWithDetail(2, 0, grassSide.r, grassSide.g, grassSide.b);
+        FillCellWithDetail(3, 0, stone.r, stone.g, stone.b);
+        FillCellWithDetail(0, 1, dirtGreen.r, dirtGreen.g, dirtGreen.b);
+        FillCellWithDetail(1, 1, stoneGreen.r, stoneGreen.g, stoneGreen.b);
+        
+        // Fill remaining filler cells
+        for (int y = 0; y < cellSize * 2; y++)
         {
-            (byte r,byte g,byte b) col = filler;
-            if (cx == 0 && cy == 0) col = grassTop;
-            if (cx == 1 && cy == 0) col = dirt;
-            if (cx == 2 && cy == 0) col = grassSide;
-            if (cx == 3 && cy == 0) col = stone;
-            if (cx == 0 && cy == 1) col = dirtGreen;
-            if (cx == 1 && cy == 1) col = stoneGreen;
-
-            int sx = cx * cellSize;
-            int sy = cy * cellSize;
-            for (int py = 0; py < cellSize; py++)
-            for (int px = 0; px < cellSize; px++)
-                SetPixel(sx + px, sy + py, col.r, col.g, col.b, 255);
+            for (int x = 0; x < cellSize * 2; x++)
+            {
+                SetPixel(cellSize * 2 + x, cellSize * 2 + y, filler.r, filler.g, filler.b, 255);
+            }
         }
 
         GL.TexImage2D(OpenTK.Graphics.OpenGL4.TextureTarget.Texture2D, 0,
@@ -115,6 +170,15 @@ public class Game : GameWindow
         GL.TexParameter(OpenTK.Graphics.OpenGL4.TextureTarget.Texture2D, OpenTK.Graphics.OpenGL4.TextureParameterName.TextureWrapT, (int)OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat);
         GL.TexParameter(OpenTK.Graphics.OpenGL4.TextureTarget.Texture2D, OpenTK.Graphics.OpenGL4.TextureParameterName.TextureMinFilter, (int)OpenTK.Graphics.OpenGL4.TextureMinFilter.Nearest);
         GL.TexParameter(OpenTK.Graphics.OpenGL4.TextureTarget.Texture2D, OpenTK.Graphics.OpenGL4.TextureParameterName.TextureMagFilter, (int)OpenTK.Graphics.OpenGL4.TextureMagFilter.Nearest);
+
+        // Enable anisotropic filtering for better texture quality at angles
+        GL.GetFloat((GetPName)0x84FF, out float maxAnisotropy); // GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT
+        if (maxAnisotropy > 0)
+        {
+            GL.TexParameter(OpenTK.Graphics.OpenGL4.TextureTarget.Texture2D, 
+                (OpenTK.Graphics.OpenGL4.TextureParameterName)0x84FE, // GL_TEXTURE_MAX_ANISOTROPY_EXT
+                maxAnisotropy);
+        }
 
         // Create crosshair
         float[] crosshairVerts = new float[]
@@ -231,13 +295,15 @@ public class Game : GameWindow
         var view = Matrix4.Identity;
         var model = Matrix4.CreateTranslation(Size.X / 2f, Size.Y / 2f, 0);
         
-        shader.Use();
-        shader.SetMatrix4("projection", orthoProj);
-        shader.SetMatrix4("view", view);
-        shader.SetMatrix4("model", model);
+        crosshairShader.Use();
+        crosshairShader.SetMatrix4("projection", orthoProj);
+        crosshairShader.SetMatrix4("view", view);
+        crosshairShader.SetMatrix4("model", model);
         
         GL.BindVertexArray(crosshairVao);
+        GL.LineWidth(2f);
         GL.DrawArrays(PrimitiveType.Lines, 0, 4);
+        GL.LineWidth(1f);
         
         GL.Enable(EnableCap.DepthTest);
     }

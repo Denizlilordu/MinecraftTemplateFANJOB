@@ -46,46 +46,44 @@ public class Camera
 
     bool CheckCollisionAtFeet(Vector3 newPos)
     {
-        // Check only at feet level (position.Y - playerHeight)
+        // Simplified feet collision: check blocks at the integer layer directly beneath the player's feet
         float checkRadius = playerRadius;
-        float feetY = newPos.Y - playerHeight;
-        
-        // Check ground block below
-        int groundY = (int)MathF.Floor(feetY);
-        
+        int blockY = (int)MathF.Floor(newPos.Y - playerHeight - 0.01f);
+
         for (float dx = -checkRadius; dx <= checkRadius; dx += 0.2f)
         {
             for (float dz = -checkRadius; dz <= checkRadius; dz += 0.2f)
             {
                 if (dx * dx + dz * dz <= checkRadius * checkRadius)
                 {
-                    if (IsBlockAtPosition(newPos + new Vector3(dx, -playerHeight, dz)))
+                    Vector3 checkPos = new Vector3(newPos.X + dx, blockY, newPos.Z + dz);
+                    if (IsBlockAtPosition(checkPos))
                         return true;
                 }
             }
         }
+
         return false;
     }
     
     Vector3 GetGroundPosition(Vector3 currentPos)
     {
-        // Find the highest block below the player and position them on top
+        // Find the highest block below the player's feet and snap the player on top of it.
         float feetY = currentPos.Y - playerHeight;
-        int checkY = (int)MathF.Floor(feetY);
-        
-        // Search downward from feet position
-        for (int y = checkY; y >= checkY - 5; y--)
+        int startY = (int)MathF.Floor(feetY);
+
+        for (int y = startY; y >= startY - 10; y--)
         {
             float checkRadius = playerRadius;
             bool hitBlock = false;
-            
+
             for (float dx = -checkRadius; dx <= checkRadius; dx += 0.2f)
             {
                 for (float dz = -checkRadius; dz <= checkRadius; dz += 0.2f)
                 {
                     if (dx * dx + dz * dz <= checkRadius * checkRadius)
                     {
-                        Vector3 checkPos = currentPos + new Vector3(dx, y - checkY, dz);
+                        Vector3 checkPos = new Vector3(currentPos.X + dx, y, currentPos.Z + dz);
                         if (IsBlockAtPosition(checkPos))
                         {
                             hitBlock = true;
@@ -95,14 +93,15 @@ public class Camera
                 }
                 if (hitBlock) break;
             }
-            
+
             if (hitBlock)
             {
-                // Position feet on top of this block
-                return currentPos + new Vector3(0, y + 1 - checkY, 0);
+                // Place feet on top of this block
+                float feetTargetY = y + 1;
+                return new Vector3(currentPos.X, feetTargetY + playerHeight, currentPos.Z);
             }
         }
-        
+
         return currentPos;
     }
 
@@ -155,7 +154,24 @@ public class Camera
         if (k.IsKeyDown(Keys.D)) move += right;
 
         if (move.LengthSquared > 0)
-            position += move.Normalized() * currentSpeed * dt;
+        {
+            // Move on X and Z separately to handle horizontal collisions and allow sliding
+            Vector3 desired = move.Normalized() * currentSpeed * dt;
+
+            // Attempt X movement
+            Vector3 tryPosX = new Vector3(position.X + desired.X, position.Y, position.Z);
+            if (!CheckCollision(tryPosX))
+            {
+                position.X = tryPosX.X;
+            }
+
+            // Attempt Z movement (after X to allow sliding along walls)
+            Vector3 tryPosZ = new Vector3(position.X, position.Y, position.Z + desired.Z);
+            if (!CheckCollision(tryPosZ))
+            {
+                position.Z = tryPosZ.Z;
+            }
+        }
 
         if (flyMode)
         {
@@ -189,8 +205,8 @@ public class Camera
             // Check collision at feet level
             if (velocityY < 0 && CheckCollisionAtFeet(newPos))
             {
-                // Landing on a block - find exact ground position
-                newPos = GetGroundPosition(position);
+                // Landing on a block - find exact ground position using the predicted position
+                newPos = GetGroundPosition(newPos);
                 velocityY = 0f;
                 grounded = true;
             }
