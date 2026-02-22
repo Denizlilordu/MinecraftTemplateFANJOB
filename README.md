@@ -7,6 +7,7 @@ C#/.NET tabanlı basit voxel oyun motoru şablonu. Minecraft benzeri oyunlar yap
 - Chunk yükleme / unloading
 - Basit procedural generation
 - FANJOB: [buraya neyse onu yaz, iç şaka mı proje adı mı?]
+- Opentk ile 3d rendering sistemi
 
 ## Kurulum
 1. Git clone https://github.com/denizlilordu/MinecraftTemplateFANJOB.git
@@ -14,9 +15,6 @@ C#/.NET tabanlı basit voxel oyun motoru şablonu. Minecraft benzeri oyunlar yap
 3. dotnet restore
 4. dotnet run
 
-## TODO
-- 3D rendering (Raylib veya OpenTK ekle)
-- ATA dil entegrasyonu (script'le blok yerleştir)
-- Multiplayer denemeleri
+unutma, bu bir engine template i bir oyun değil geri kalanı senin özgür geliştiriciliğine bağlıdır
 
-Lisans: MIT
+
