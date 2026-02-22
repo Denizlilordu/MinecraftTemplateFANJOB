@@ -384,11 +384,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\amucu\\OneDrive\\koddddd\\VoxelGame\\VoxelGame.csproj",
+      "projectUniqueName": "C:\\Users\\amucu\\OneDrive\\Belgeler\\GitHub\\MinecraftTemplateFANJOB\\koddddd\\VoxelGame\\VoxelGame.csproj",
       "projectName": "VoxelGame",
-      "projectPath": "C:\\Users\\amucu\\OneDrive\\koddddd\\VoxelGame\\VoxelGame.csproj",
+      "projectPath": "C:\\Users\\amucu\\OneDrive\\Belgeler\\GitHub\\MinecraftTemplateFANJOB\\koddddd\\VoxelGame\\VoxelGame.csproj",
       "packagesPath": "C:\\Users\\amucu\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\amucu\\OneDrive\\koddddd\\VoxelGame\\obj\\",
+      "outputPath": "C:\\Users\\amucu\\OneDrive\\Belgeler\\GitHub\\MinecraftTemplateFANJOB\\koddddd\\VoxelGame\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\amucu\\AppData\\Roaming\\NuGet\\NuGet.Config"
