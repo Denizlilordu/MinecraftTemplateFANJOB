@@ -13,6 +13,11 @@ public class Game : GameWindow
     int crosshairVao;
     int crosshairVbo;
 
+    // FPS Counter
+    double fpsCounter = 0;
+    int frameCount = 0;
+    double fpsUpdateInterval = 0.5; // update every 0.5 seconds
+
     public Game(GameWindowSettings g, NativeWindowSettings n) : base(g, n) { }
 
     protected override void OnLoad()
@@ -85,6 +90,10 @@ public class Game : GameWindow
 
         camera = new Camera(new Vector3(8, 10, 25));
         camera.SetChunks(chunks);
+
+        // Give each chunk a reference to the full chunk list so they can query neighbors
+        foreach (var ch in chunks)
+            ch.SetChunksReference(chunks);
 
         // Create a 4x4 cell atlas (256x256 px) programmatically with high detail
         texture = GL.GenTexture();
@@ -256,6 +265,17 @@ public class Game : GameWindow
 
     protected override void OnRenderFrame(FrameEventArgs e)
     {
+        // Update FPS counter
+        fpsCounter += e.Time;
+        frameCount++;
+        if (fpsCounter >= fpsUpdateInterval)
+        {
+            double fps = frameCount / fpsCounter;
+            Title = $"C# Voxel Prototype - FPS: {fps:F1}";
+            fpsCounter = 0;
+            frameCount = 0;
+        }
+
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
         var view = camera.GetViewMatrix();

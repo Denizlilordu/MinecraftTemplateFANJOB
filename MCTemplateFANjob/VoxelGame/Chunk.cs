@@ -6,7 +6,7 @@ namespace VoxelGame;
 
 public class Chunk
 {
-    const int SIZE = 16;
+    const int SIZE = 64;
     int[,,] blocks = new int[SIZE, SIZE, SIZE];
 
     int vao;
@@ -15,6 +15,7 @@ public class Chunk
 
     int baseX;
     int baseZ;
+    List<Chunk>? allChunks;
 
     public Chunk(int chunkX, int chunkZ)
     {
@@ -42,6 +43,12 @@ public class Chunk
         BuildMesh();
     }
 
+    // Called by the world to provide access to other chunks for neighbor checks
+    public void SetChunksReference(List<Chunk> chunks)
+    {
+        allChunks = chunks;
+    }
+
     void BuildMesh()
     {
         List<float> vertices = new();
@@ -57,27 +64,45 @@ public class Chunk
             int blockType = blocks[x,y,z];
             
             // Üst
-            if (y+1 >= SIZE || blocks[x,y+1,z] == 0)
+            bool aboveOccupied;
+            if (y+1 < SIZE) aboveOccupied = blocks[x,y+1,z] != 0;
+            else aboveOccupied = IsGlobalOccupied(baseX * SIZE + x, y+1, baseZ * SIZE + z);
+            if (!aboveOccupied)
                 AddTop(vertices, pos, blockType);
 
             // Alt
-            if (y-1 < 0 || blocks[x,y-1,z] == 0)
+            bool belowOccupied;
+            if (y-1 >= 0) belowOccupied = blocks[x,y-1,z] != 0;
+            else belowOccupied = IsGlobalOccupied(baseX * SIZE + x, y-1, baseZ * SIZE + z);
+            if (!belowOccupied)
                 AddBottom(vertices, pos, blockType);
 
             // Sağ
-            if (x+1 >= SIZE || blocks[x+1,y,z] == 0)
+            bool rightOccupied;
+            if (x+1 < SIZE) rightOccupied = blocks[x+1,y,z] != 0;
+            else rightOccupied = IsGlobalOccupied(baseX * SIZE + x+1, y, baseZ * SIZE + z);
+            if (!rightOccupied)
                 AddRight(vertices, pos, blockType);
 
             // Sol
-            if (x-1 < 0 || blocks[x-1,y,z] == 0)
+            bool leftOccupied;
+            if (x-1 >= 0) leftOccupied = blocks[x-1,y,z] != 0;
+            else leftOccupied = IsGlobalOccupied(baseX * SIZE + x-1, y, baseZ * SIZE + z);
+            if (!leftOccupied)
                 AddLeft(vertices, pos, blockType);
 
             // Ön
-            if (z+1 >= SIZE || blocks[x,y,z+1] == 0)
+            bool frontOccupied;
+            if (z+1 < SIZE) frontOccupied = blocks[x,y,z+1] != 0;
+            else frontOccupied = IsGlobalOccupied(baseX * SIZE + x, y, baseZ * SIZE + z+1);
+            if (!frontOccupied)
                 AddFront(vertices, pos, blockType);
 
             // Arka
-            if (z-1 < 0 || blocks[x,y,z-1] == 0)
+            bool backOccupied;
+            if (z-1 >= 0) backOccupied = blocks[x,y,z-1] != 0;
+            else backOccupied = IsGlobalOccupied(baseX * SIZE + x, y, baseZ * SIZE + z-1);
+            if (!backOccupied)
                 AddBack(vertices, pos, blockType);
         }
 
@@ -104,36 +129,37 @@ public class Chunk
     {
         // Each cell in atlas is 0.25x0.25
         float cellSize = 0.25f;
-        float u, v;
-        
+        float u = 0f, v = 0f;
+
         // Assign UV cells based on block type and face
-        if (blockType == 1) // grass top
+        // Atlas mapping (see Game.cs):
+        // (0,0): grass top, (1,0): dirt, (2,0): grass side, (3,0): stone
+        if (blockType == 1) // grass
         {
-            // Top face = (0,0), sides = (2,0), bottom = (1,0)
-            if (face == 0) { u = 0f; v = 0f; } // top
-            else if (face == 1) { u = cellSize; v = 0f; } // sides
-            else { u = cellSize; v = 0f; } // bottom
+            if (face == 0) { u = 0f; v = 0f; }            // top -> (0,0)
+            else if (face == 1) { u = cellSize * 1; v = 0f; } // bottom -> (1,0)
+            else { u = cellSize * 2; v = 0f; }            // sides -> (2,0)
         }
-        else if (blockType == 2) // dirt (green)
+        else if (blockType == 2) // dirt
         {
-            // All faces green
-            u = 0f; v = cellSize; // cell (0,1)
+            u = cellSize * 1; v = 0f; // (1,0)
         }
-        else if (blockType == 3) // stone (green)
+        else if (blockType == 3) // stone
         {
-            // All faces green stone
-            u = cellSize; v = cellSize; // cell (1,1)
+            u = cellSize * 3; v = 0f; // (3,0)
         }
         else
         {
             u = 0f; v = 0f;
         }
-        
-        // Add corner offset (0.25 = full cell, so corner gives sub-coords)
-        float[] corners = { 0f, cellSize, cellSize, 0f };
-        u += corners[corner % 4] * 0.25f;
-        v += corners[(corner / 2) % 2] * 0.25f;
-        
+
+        // Add corner offset within the selected atlas cell
+        float[] cornerU = { 0f, cellSize, cellSize, 0f };
+        float[] cornerV = { 0f, 0f, cellSize, cellSize };
+        int ci = corner % 4;
+        u += cornerU[ci];
+        v += cornerV[ci];
+
         return (u, v);
     }
     
@@ -266,6 +292,31 @@ public class Chunk
             blocks[localX, globalY, localZ] = blockType;
             BuildMesh();
             return true;
+        }
+        return false;
+    }
+
+    // Return block id at given global coordinates relative to this chunk (0 if outside bounds)
+    public int GetBlockAtGlobal(int globalX, int globalY, int globalZ)
+    {
+        int localX = globalX - baseX * SIZE;
+        int localZ = globalZ - baseZ * SIZE;
+
+        if (localX < 0 || localX >= SIZE || globalY < 0 || globalY >= SIZE || localZ < 0 || localZ >= SIZE)
+            return 0;
+
+        return blocks[localX, globalY, localZ];
+    }
+
+    bool IsGlobalOccupied(int globalX, int globalY, int globalZ)
+    {
+        if (globalY < 0 || globalY >= SIZE) return false;
+        if (allChunks == null) return false;
+
+        foreach (var c in allChunks)
+        {
+            if (c.GetBlockAtGlobal(globalX, globalY, globalZ) != 0)
+                return true;
         }
         return false;
     }
