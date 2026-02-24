@@ -9,6 +9,7 @@ public class Game : GameWindow
     Shader crosshairShader = null!;
     List<Chunk> chunks = new();
     Camera camera;
+    Inventory inventory = new();
     int texture;
     int crosshairVao;
     int crosshairVbo;
@@ -217,6 +218,14 @@ public class Game : GameWindow
             camera.ToggleFly();
         }
         
+        // Hotbar slot selection (1-9 keys)
+        for (int i = 0; i < 9; i++)
+        {
+            var key = (OpenTK.Windowing.GraphicsLibraryFramework.Keys)('1' + i);
+            if (KeyboardState.IsKeyPressed(key))
+                inventory.SelectSlot(i);
+        }
+        
         camera.SetChunks(chunks);
         // Lock cursor while Ctrl is held, free it on Escape
         if (KeyboardState.IsKeyDown(OpenTK.Windowing.GraphicsLibraryFramework.Keys.LeftControl) ||
@@ -239,8 +248,13 @@ public class Game : GameWindow
                 var blockPos = lookat.Value.blockPos;
                 foreach (var chunk in chunks)
                 {
-                    if (chunk.BreakBlock((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z))
+                    if (chunk.BreakBlock((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, out int brokenBlockType))
+                    {
+                        // Add broken block to inventory
+                        if (brokenBlockType != 0)
+                            inventory.AddItem(brokenBlockType, 1);
                         break;
+                    }
                 }
             }
         }
@@ -252,10 +266,13 @@ public class Game : GameWindow
             if (lookat.HasValue)
             {
                 var placePos = lookat.Value.placePosi;
-                foreach (var chunk in chunks)
+                if (inventory.TryUseSelected(out int blockType))
                 {
-                    if (chunk.PlaceBlock((int)placePos.X, (int)placePos.Y, (int)placePos.Z, 2))
-                        break;
+                    foreach (var chunk in chunks)
+                    {
+                        if (chunk.PlaceBlock((int)placePos.X, (int)placePos.Y, (int)placePos.Z, blockType))
+                            break;
+                    }
                 }
             }
         }
@@ -265,13 +282,22 @@ public class Game : GameWindow
 
     protected override void OnRenderFrame(FrameEventArgs e)
     {
-        // Update FPS counter
+        // Update FPS counter and display inventory
         fpsCounter += e.Time;
         frameCount++;
         if (fpsCounter >= fpsUpdateInterval)
         {
             double fps = frameCount / fpsCounter;
-            Title = $"C# Voxel Prototype - FPS: {fps:F1}";
+            int selectedBlockType = inventory.GetSelectedBlockType();
+            int selectedCount = inventory.GetSelectedCount();
+            string blockName = selectedBlockType switch 
+            {
+                1 => "Grass",
+                2 => "Dirt", 
+                3 => "Stone",
+                _ => "None"
+            };
+            Title = $"C# Voxel Prototype - FPS: {fps:F1} | Slot: {selectedBlockType} {blockName} x{selectedCount}";
             fpsCounter = 0;
             frameCount = 0;
         }

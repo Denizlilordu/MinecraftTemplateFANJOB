@@ -264,15 +264,18 @@ public class Chunk
         return blockType == 1 || blockType == 2 || blockType == 3;
     }
 
-    public bool BreakBlock(int globalX, int globalY, int globalZ)
+    public bool BreakBlock(int globalX, int globalY, int globalZ, out int blockType)
     {
         int localX = globalX - baseX * SIZE;
         int localZ = globalZ - baseZ * SIZE;
 
+        blockType = 0;
+
         if (localX < 0 || localX >= SIZE || globalY < 0 || globalY >= SIZE || localZ < 0 || localZ >= SIZE)
             return false;
 
-        if (blocks[localX, globalY, localZ] != 0)
+        blockType = blocks[localX, globalY, localZ];
+        if (blockType != 0)
         {
             blocks[localX, globalY, localZ] = 0;
             BuildMesh();
