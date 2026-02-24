@@ -259,7 +259,9 @@ public class Chunk
         if (localX < 0 || localX >= SIZE || globalY < 0 || globalY >= SIZE || localZ < 0 || localZ >= SIZE)
             return false;
 
-        return blocks[localX, globalY, localZ] != 0;
+        int blockType = blocks[localX, globalY, localZ];
+        // Solid blocks are types 1 (grass), 2 (dirt), 3 (stone)
+        return blockType == 1 || blockType == 2 || blockType == 3;
     }
 
     public bool BreakBlock(int globalX, int globalY, int globalZ)

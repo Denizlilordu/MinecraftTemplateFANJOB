@@ -14,8 +14,8 @@ public class Camera
     float velocityY = 0f;
     bool grounded = false;
     bool flyMode = false;
-    float playerRadius = 0.3f;
-    float playerHeight = 1.5f;  // Player is 1.5 blocks tall
+    float playerRadius = 0.4f;
+    float playerHeight = 1.8f;  // Player is 1.8 blocks tall
     List<Chunk> chunks = null!;
 
     public Camera(Vector3 start)
@@ -50,9 +50,9 @@ public class Camera
         float checkRadius = playerRadius;
         int blockY = (int)MathF.Floor(newPos.Y - playerHeight - 0.01f);
 
-        for (float dx = -checkRadius; dx <= checkRadius; dx += 0.2f)
+        for (float dx = -checkRadius; dx <= checkRadius; dx += 0.1f)
         {
-            for (float dz = -checkRadius; dz <= checkRadius; dz += 0.2f)
+            for (float dz = -checkRadius; dz <= checkRadius; dz += 0.1f)
             {
                 if (dx * dx + dz * dz <= checkRadius * checkRadius)
                 {
@@ -77,9 +77,9 @@ public class Camera
             float checkRadius = playerRadius;
             bool hitBlock = false;
 
-            for (float dx = -checkRadius; dx <= checkRadius; dx += 0.2f)
+            for (float dx = -checkRadius; dx <= checkRadius; dx += 0.1f)
             {
-                for (float dz = -checkRadius; dz <= checkRadius; dz += 0.2f)
+                for (float dz = -checkRadius; dz <= checkRadius; dz += 0.1f)
                 {
                     if (dx * dx + dz * dz <= checkRadius * checkRadius)
                     {
@@ -107,20 +107,20 @@ public class Camera
 
     bool CheckCollision(Vector3 newPos)
     {
-        // Check collision cylinder: radius=0.3, height=2.5
+        // Check collision cylinder: radius=0.4, height=1.8
         // Position is at eye level, so check from (position - playerHeight) to position
         float checkRadius = playerRadius;
         float feetY = newPos.Y - playerHeight;
         
-        // Check at multiple heights along the player body
-        for (float heightOffset = 0f; heightOffset <= playerHeight; heightOffset += 0.5f)
+        // Check at multiple heights along the player body with finer sampling
+        for (float heightOffset = 0f; heightOffset <= playerHeight; heightOffset += 0.3f)
         {
             float checkY = feetY + heightOffset;
             
-            // Check a circle at this height around the player position
-            for (float dx = -checkRadius; dx <= checkRadius; dx += 0.2f)
+            // Check a circle at this height around the player position with denser sampling
+            for (float dx = -checkRadius; dx <= checkRadius; dx += 0.1f)
             {
-                for (float dz = -checkRadius; dz <= checkRadius; dz += 0.2f)
+                for (float dz = -checkRadius; dz <= checkRadius; dz += 0.1f)
                 {
                     if (dx * dx + dz * dz <= checkRadius * checkRadius)
                     {
