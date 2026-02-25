@@ -10,6 +10,7 @@ public class Game : GameWindow
     List<Chunk> chunks = new();
     Camera camera;
     Inventory inventory = new();
+    Lighting lighting = new();
     int texture;
     int crosshairVao;
     int crosshairVbo;
@@ -31,16 +32,24 @@ public class Game : GameWindow
         #version 330 core
         layout (location = 0) in vec3 aPos;
         layout (location = 1) in vec2 aTexCoord;
+        layout (location = 2) in vec3 aNormal;
+        layout (location = 3) in float aLight;
 
         uniform mat4 model;
         uniform mat4 view;
         uniform mat4 projection;
 
         out vec2 TexCoord;
+        out vec3 Normal;
+        out vec3 FragPos;
+        out float Light;
 
         void main()
         {
             TexCoord = aTexCoord;
+            Normal = normalize(mat3(transpose(inverse(model))) * aNormal);
+            FragPos = vec3(model * vec4(aPos, 1.0));
+            Light = aLight;
             gl_Position = projection * view * model * vec4(aPos, 1.0);
         }";
 
@@ -48,11 +57,32 @@ public class Game : GameWindow
         #version 330 core
         out vec4 FragColor;
         in vec2 TexCoord;
+        in vec3 Normal;
+        in vec3 FragPos;
+        in float Light;
+        
         uniform sampler2D tex;
+        uniform vec3 lightDir;
+        uniform vec3 lightColor;
+        uniform vec3 ambientColor;
+        uniform float lightIntensity;
 
         void main()
         {
-            FragColor = texture(tex, TexCoord);
+            vec4 texColor = texture(tex, TexCoord);
+            
+            vec3 norm = normalize(Normal);
+            float diff = max(dot(norm, normalize(lightDir)), 0.0);
+            
+            vec3 diffuse = (diff * 0.7 + 0.2) * lightColor * lightIntensity;
+            
+            vec3 ambient = ambientColor * (Light / 15.0);
+            
+            ambient += ambientColor * 0.2;
+            
+            vec3 lighting = ambient + diffuse * 0.8;
+            
+            FragColor = vec4(texColor.rgb * lighting, texColor.a);
         }";
 
         shader = new Shader(vertex, fragment);
@@ -212,6 +242,15 @@ public class Game : GameWindow
 
     protected override void OnUpdateFrame(FrameEventArgs e)
     {
+        // Update lighting
+        lighting.Update((float)e.Time);
+        
+        // Toggle fullbrite with F
+        if (KeyboardState.IsKeyPressed(OpenTK.Windowing.GraphicsLibraryFramework.Keys.F))
+        {
+            lighting.ToggleFullbrite();
+        }
+        
         // Toggle creative fly mode with C
         if (KeyboardState.IsKeyPressed(OpenTK.Windowing.GraphicsLibraryFramework.Keys.C))
         {
@@ -319,6 +358,12 @@ public class Game : GameWindow
         shader.SetMatrix4("view", view);
         shader.SetMatrix4("projection", projection);
         shader.SetMatrix4("model", Matrix4.Identity);
+        
+        // Lighting uniforms
+        shader.SetVector3("lightDir", lighting.LightDirection);
+        shader.SetVector3("lightColor", lighting.LightColor);
+        shader.SetVector3("ambientColor", lighting.AmbientColor);
+        shader.SetFloat("lightIntensity", lighting.LightIntensity);
 
         // Bind texture unit 0
         OpenTK.Graphics.OpenGL4.GL.ActiveTexture(OpenTK.Graphics.OpenGL4.TextureUnit.Texture0);

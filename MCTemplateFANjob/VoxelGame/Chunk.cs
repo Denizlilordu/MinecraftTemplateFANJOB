@@ -8,6 +8,7 @@ public class Chunk
 {
     const int SIZE = 64;
     int[,,] blocks = new int[SIZE, SIZE, SIZE];
+    LightPropagation? lightPropagation;
 
     int vao;
     int vbo;
@@ -47,10 +48,17 @@ public class Chunk
     public void SetChunksReference(List<Chunk> chunks)
     {
         allChunks = chunks;
+        lightPropagation?.SetChunksReference(chunks);
     }
 
     void BuildMesh()
     {
+        // Initialize light propagation if needed
+        if (lightPropagation == null)
+        {
+            lightPropagation = new LightPropagation(blocks, baseX, baseZ);
+        }
+        
         List<float> vertices = new();
 
         for (int x = 0; x < SIZE; x++)
@@ -118,11 +126,24 @@ public class Chunk
             vertices.Count * sizeof(float),
             vertices.ToArray(),
             BufferUsageHint.StaticDraw);
-        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 5*sizeof(float), 0);
+            
+        const int stride = 9 * sizeof(float);
+        
+        // Position
+        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride, 0);
         GL.EnableVertexAttribArray(0);
 
-        GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 5*sizeof(float), 3*sizeof(float));
+        // TexCoord
+        GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride, 3*sizeof(float));
         GL.EnableVertexAttribArray(1);
+        
+        // Normal
+        GL.VertexAttribPointer(2, 3, VertexAttribPointerType.Float, false, stride, 5*sizeof(float));
+        GL.EnableVertexAttribArray(2);
+        
+        // Light
+        GL.VertexAttribPointer(3, 1, VertexAttribPointerType.Float, false, stride, 8*sizeof(float));
+        GL.EnableVertexAttribArray(3);
     }
 
     (float u, float v) GetTexCoord(int blockType, int face, int corner)
@@ -170,13 +191,17 @@ public class Chunk
         AddTri(v, c, d, a, blockType, face, 2, 3, 0);
     }
     
-    void AddVertex(List<float> verts, Vector3 pos, float u, float tv)
+    void AddVertex(List<float> verts, Vector3 pos, float u, float tv, Vector3 normal, float light)
     {
         verts.Add(pos.X);
         verts.Add(pos.Y);
         verts.Add(pos.Z);
         verts.Add(u);
         verts.Add(tv);
+        verts.Add(normal.X);
+        verts.Add(normal.Y);
+        verts.Add(normal.Z);
+        verts.Add(light);
     }
 
     void AddTri(List<float> v, Vector3 a, Vector3 b, Vector3 c, int blockType, int face, int c0, int c1, int c2)
@@ -185,9 +210,41 @@ public class Chunk
         var (u1, v1) = GetTexCoord(blockType, face, c1);
         var (u2, v2) = GetTexCoord(blockType, face, c2);
         
-        AddVertex(v, a, u0, v0);
-        AddVertex(v, b, u1, v1);
-        AddVertex(v, c, u2, v2);
+        Vector3 normal = GetFaceNormal(face);
+        
+        // Light değerlerini pozisyondan hesapla
+        // Chunk-relative koordinat
+        int lx0 = (int)a.X % SIZE;
+        int ly0 = (int)a.Y;
+        int lz0 = (int)a.Z % SIZE;
+        
+        int lx1 = (int)b.X % SIZE;
+        int ly1 = (int)b.Y;
+        int lz1 = (int)b.Z % SIZE;
+        
+        int lx2 = (int)c.X % SIZE;
+        int ly2 = (int)c.Y;
+        int lz2 = (int)c.Z % SIZE;
+        
+        float light0 = lightPropagation?.GetNormalizedLight(lx0, ly0, lz0) ?? 1f;
+        float light1 = lightPropagation?.GetNormalizedLight(lx1, ly1, lz1) ?? 1f;
+        float light2 = lightPropagation?.GetNormalizedLight(lx2, ly2, lz2) ?? 1f;
+        
+        AddVertex(v, a, u0, v0, normal, light0);
+        AddVertex(v, b, u1, v1, normal, light1);
+        AddVertex(v, c, u2, v2, normal, light2);
+    }
+    
+    Vector3 GetFaceNormal(int face)
+    {
+        return face switch
+        {
+            0 => Vector3.UnitY,      // Top (+Y)
+            1 => -Vector3.UnitY,     // Bottom (-Y)
+            2 => Vector3.UnitX,      // Right (+X) / Left (-X)
+            3 => Vector3.UnitZ,      // Front (+Z) / Back (-Z)
+            _ => Vector3.UnitY
+        };
     }
     void AddTop(List<float> v, Vector3 p, int blockType)
     {

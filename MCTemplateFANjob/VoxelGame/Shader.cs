@@ -56,4 +56,16 @@ public class Shader
         int loc = GL.GetUniformLocation(Handle, name);
         GL.Uniform1(loc, value);
     }
+
+    public void SetFloat(string name, float value)
+    {
+        int loc = GL.GetUniformLocation(Handle, name);
+        GL.Uniform1(loc, value);
+    }
+
+    public void SetVector3(string name, Vector3 value)
+    {
+        int loc = GL.GetUniformLocation(Handle, name);
+        GL.Uniform3(loc, value.X, value.Y, value.Z);
+    }
 }
